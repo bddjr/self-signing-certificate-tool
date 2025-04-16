@@ -11,6 +11,10 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Self-Signing Certificate Tool</title>
 	<style>
+		.version::before {
+			content: 'v0.0.2';
+		}
+
 		* {
 			color-scheme: light dark;
 			box-sizing: border-box;
@@ -243,16 +247,24 @@
 		div.GenerateButton {
 			margin: 16px 0 24px;
 		}
+
+		div.title>:not(:first-child) {
+			font-size: 12px;
+			color: gray;
+		}
 	</style>
 </head>
 
 <body>
 	<div id="loading"></div>
 	<main>
-		<h1>Self-Signing Certificate Tool</h1>
-		<a style="font-size: 12px;" target="_blank"
-			href="https://github.com/bddjr/self-signing-certificate-tool">https://github.com/bddjr/self-signing-certificate-tool</a>
-		<hr>
+		<div class="title">
+			<h1>Self-Signing Certificate Tool</h1>
+			<span class="version"></span>
+			<a style="font-size: 12px;" target="_blank"
+				href="https://github.com/bddjr/self-signing-certificate-tool">github.com/bddjr/self-signing-certificate-tool</a>
+			<hr>
+		</div>
 		<div id="CA" class="certmain">
 			<h3>CA</h3>
 			<form id="CARadio">
@@ -273,16 +285,16 @@
 				</div>
 				<div>
 					<span>Days</span>
-					<div><input type="number" name="Days" value="3650" min="0"></div>
+					<div><input type="number" name="Days" value="3970" min="0"></div>
 				</div>
 				<div>
 					<span>ECC</span>
 					<div>
 						<select name="ECC">
 							<option value="P-224">P-224</option>
-							<option value="P-256" selected>P-256</option>
+							<option value="P-256">P-256</option>
 							<option value="P-384">P-384</option>
-							<option value="P-521">P-521</option>
+							<option value="P-521" selected>P-521</option>
 						</select>
 					</div>
 				</div>
@@ -326,7 +338,7 @@
 				</div>
 				<div>
 					<span>Days</span>
-					<div><input type="number" name="Days" value="3650" min="0"></div>
+					<div><input type="number" name="Days" value="397" min="0"></div>
 				</div>
 				<div>
 					<span>SAN</span>
@@ -339,9 +351,9 @@
 					<div>
 						<select name="ECC">
 							<option value="P-224">P-224</option>
-							<option value="P-256" selected>P-256</option>
+							<option value="P-256">P-256</option>
 							<option value="P-384">P-384</option>
-							<option value="P-521">P-521</option>
+							<option value="P-521" selected>P-521</option>
 						</select>
 					</div>
 				</div>
