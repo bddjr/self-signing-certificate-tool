@@ -1,0 +1,668 @@
+<!-- 
+	Copyright © 2025 bddjr
+	MIT license
+-->
+
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Self-Signing Certificate Tool</title>
+	<style>
+		* {
+			color-scheme: light dark;
+			box-sizing: border-box;
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			outline-color: #0069da;
+		}
+
+		body {
+			max-width: 500px;
+			margin: 0 auto;
+			--blue: hsl(212, 100%, 50%);
+		}
+
+		#loading {
+			background: hsla(0, 0%, 0%, 0.3);
+			position: fixed;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			backdrop-filter: blur(4px);
+		}
+
+		#loading::before {
+			content: '';
+			animation: loadingcircle infinite 0.8s linear;
+			width: 36px;
+			height: 36px;
+			border: 4px solid transparent;
+			border-left-color: white;
+			border-radius: 100%;
+		}
+
+		#loading:not([loading]) {
+			display: none;
+		}
+
+		@keyframes loadingcircle {
+			100% {
+				transform: rotate(360deg);
+			}
+		}
+
+		main {
+			margin: 16px 16px 60px;
+		}
+
+		h1 {
+			font-size: 24px;
+			font-weight: 100;
+			margin-bottom: 0;
+		}
+
+		a {
+			color: var(--blue);
+		}
+
+		hr {
+			border: none;
+			height: 1px;
+			background-color: lightblue;
+		}
+
+		button:not(.buttonradio),
+		input[type=file]::file-selector-button {
+			border: none;
+			background-color: var(--blue);
+			color: white;
+			padding: 6px 10px;
+			border-radius: 8px;
+			cursor: pointer;
+			transition: background-color 0.2s;
+			font-size: 15px;
+		}
+
+		button:not(.buttonradio):hover,
+		input[type=file]:hover::file-selector-button {
+			background-color: hsl(212, 100%, 40%);
+		}
+
+		button:not(.buttonradio):active,
+		input[type=file]:active::file-selector-button {
+			background-color: hsl(212, 100%, 30%);
+		}
+
+		button:not(.buttonradio):disabled {
+			background-color: var(--blue);
+			opacity: 0.4;
+			cursor: no-drop;
+		}
+
+		input,
+		textarea,
+		select {
+			padding: 6px;
+			border: hsl(195, 100%, 50%) solid 1px;
+			border-radius: 6px;
+			font-size: 15px;
+		}
+
+		select {
+			appearance: base-select;
+			padding: 8px;
+			width: 90px;
+			cursor: pointer;
+			transition: 0.2s;
+			bottom: 0;
+		}
+
+		::picker(select) {
+			appearance: base-select;
+			border-radius: 8px;
+			border: 1px solid gray;
+			transition: background-color 0.2s;
+			bottom: 0;
+		}
+
+		option {
+			padding: 8px;
+			cursor: pointer;
+			transition: background-color 0.2s;
+		}
+
+		option:focus {
+			background-color: var(--blue);
+			color: white;
+		}
+
+		input[type=file] {
+			cursor: pointer;
+		}
+
+		input[type=number]::-webkit-inner-spin-button,
+		input[type=number]::-webkit-outer-spin-button {
+			appearance: none;
+		}
+
+		input[type=number] {
+			/* for firefox */
+			appearance: textfield;
+		}
+
+		.buttonradio {
+			cursor: pointer;
+			display: inline-flex;
+			align-items: center;
+			font-size: 15px;
+			background: none;
+			border: none;
+			padding: 0;
+			margin: 0 14px 0 0 !important;
+		}
+
+		input[type=radio] {
+			accent-color: var(--blue);
+			margin-left: 0;
+			margin-right: 6px;
+			cursor: pointer;
+		}
+
+		#CA:has(#CARadio [value=generate]:not(:checked)) #CAGenerate,
+		#CA:has(#CARadio [value=input]:not(:checked)) #CAInput {
+			display: none;
+		}
+
+		#CA>h3 {
+			margin-bottom: 0;
+		}
+
+		.certmain>* {
+			display: block;
+			margin: 16px 0;
+		}
+
+		.certmain>*>* {
+			margin: 10px 0;
+		}
+
+		.certform>div {
+			display: flex;
+			width: 100%;
+			align-items: center;
+		}
+
+		.certform>div>span:first-child {
+			width: 70px;
+			font-size: 15px;
+		}
+
+		.certform>div>div {
+			width: calc(100% - 70px);
+		}
+
+		.certform>div>div>input {
+			width: 100%;
+		}
+
+		.certform>div>div>textarea {
+			width: 100%;
+			height: 100px;
+			min-height: 70px;
+			max-height: 60vh;
+			resize: vertical;
+		}
+
+		.certform>div>div>input[type=number] {
+			width: 90px;
+		}
+
+		.certform>div>button {
+			margin-right: 10px;
+		}
+
+		.updatetime {
+			color: gray;
+			display: inline-block;
+			margin-left: 14px;
+			font-size: 13px;
+		}
+
+		button.GenerateButton {
+			font-size: 18px;
+			padding: 10px 24px;
+			margin-right: 0 !important;
+		}
+
+		div.GenerateButton {
+			margin: 16px 0 24px;
+		}
+	</style>
+</head>
+
+<body>
+	<div id="loading"></div>
+	<main>
+		<h1>Self-Signing Certificate Tool</h1>
+		<a style="font-size: 12px;" target="_blank"
+			href="https://github.com/bddjr/self-signing-certificate-tool">https://github.com/bddjr/self-signing-certificate-tool</a>
+		<hr>
+		<div id="CA" class="certmain">
+			<h3>CA</h3>
+			<form id="CARadio">
+				<button type="button" class="buttonradio" onclick="CARadioGenerate.click()">
+					<input type="radio" name="CARadio" value="generate" id="CARadioGenerate" tabindex="-1" checked>
+					Generate
+				</button>
+				<button type="button" class="buttonradio" onclick="CARadioInput.click()">
+					<input type="radio" name="CARadio" value="input" id="CARadioInput" tabindex="-1">
+					Input
+				</button>
+			</form>
+
+			<div class="certform" id="CAGenerate">
+				<div>
+					<span>CN</span>
+					<div><input type="text" name="CN" value="Self-Signing Certificate Tool"></div>
+				</div>
+				<div>
+					<span>Days</span>
+					<div><input type="number" name="Days" value="3650" min="0"></div>
+				</div>
+				<div>
+					<span>ECC</span>
+					<div>
+						<select name="ECC">
+							<option value="P-224">P-224</option>
+							<option value="P-256" selected>P-256</option>
+							<option value="P-384">P-384</option>
+							<option value="P-521">P-521</option>
+						</select>
+					</div>
+				</div>
+				<div class="GenerateButton">
+					<button id="CAGenerateButton" class="GenerateButton">Generate</button>
+					<span class="updatetime">
+						Update Time:<br>
+						<span id="CAUpdateTime">-</span>
+					</span>
+				</div>
+				<div>
+					<span>📄 Cert</span>
+					<button id="CADownloadCert" disabled>📥 Download</button>
+					<button id="CACopyCert" disabled>📋 Copy</button>
+				</div>
+				<div>
+					<span>🔑 Key</span>
+					<button id="CADownloadKey" disabled>📥 Download</button>
+					<button id="CACopyKey" disabled>📋 Copy</button>
+				</div>
+			</div>
+
+			<div class="certform" id="CAInput">
+				<div>
+					<span>📄 Cert</span>
+					<div><input type="file" name="CACert" accept=".crt, .cer, .pem, .der"></div>
+				</div>
+				<div>
+					<span>🔑 Key</span>
+					<div><input type="file" name="CAKey" accept=".key, .pem, .der"></div>
+				</div>
+			</div>
+		</div>
+		<hr>
+		<div id="Server" class="certmain">
+			<h3>Server</h3>
+			<div class="certform" id="ServerGenerate">
+				<div>
+					<span>CN</span>
+					<div><input type="text" name="CN" value="Server"></div>
+				</div>
+				<div>
+					<span>Days</span>
+					<div><input type="number" name="Days" value="3650" min="0"></div>
+				</div>
+				<div>
+					<span>SAN</span>
+					<div>
+						<textarea name="SAN" placeholder="Subject Alternative Name"></textarea>
+					</div>
+				</div>
+				<div>
+					<span>ECC</span>
+					<div>
+						<select name="ECC">
+							<option value="P-224">P-224</option>
+							<option value="P-256" selected>P-256</option>
+							<option value="P-384">P-384</option>
+							<option value="P-521">P-521</option>
+						</select>
+					</div>
+				</div>
+				<div>
+					<span>P12 Key</span>
+					<div><input type="text" name="P12Key" value="123456" autocomplete="off"></div>
+				</div>
+				<div class="GenerateButton">
+					<button id="ServerGenerateButton" class="GenerateButton">Generate</button>
+					<span class="updatetime">
+						Update Time:<br>
+						<span id="ServerUpdateTime">-</span>
+					</span>
+				</div>
+				<div>
+					<span>📄 Cert</span>
+					<button id="ServerDownloadCert" disabled>📥 Download</button>
+					<button id="ServerCopyCert" disabled>📋 Copy</button>
+				</div>
+				<div>
+					<span>🔑 Key</span>
+					<button id="ServerDownloadKey" disabled>📥 Download</button>
+					<button id="ServerCopyKey" disabled>📋 Copy</button>
+				</div>
+				<div>
+					<span>🔐 p12</span>
+					<button id="ServerDownloadP12" disabled>📥 Download</button>
+				</div>
+			</div>
+		</div>
+	</main>
+
+	<script>
+		/** @type {{
+			CA: {
+				Cert: string,
+				Key: string,
+			},
+			Server: {
+				Cert: string,
+				Key: string,
+				P12: Blob,
+			},
+		} */
+		const certs = { CA: {}, Server: {} }
+
+		/** 
+		 * @param {boolean} disabled
+		 * @param {HTMLButtonElement[]} elements
+		*/
+		function setDisabled(disabled, ...elements) {
+			for (const e of elements) {
+				e.disabled = disabled
+			}
+		}
+
+		/**
+		 * @param {string} ip
+		 */
+		function checkIP(ip) {
+			const output = {
+				valid: false,
+				isIP: false,
+
+				// example.com => example.com
+				// 127.0.0.1 => 127.0.0.1
+				// ::1 => ::1
+				// [::1] => ::1
+				output: ''
+			}
+
+			if (ip.includes(':')) {
+				if (ip.includes('.')) {
+					// invalid
+					return output
+				}
+				// ipv6
+				if (!ip.startsWith('[')) {
+					ip = `[${ip}]`
+				}
+				output.isIP = true
+			} else if (/^[0-9\.]+$/.test(ip)) {
+				// ipv4
+				output.isIP = true
+			}
+
+			const invalidHostname = `${Date.now()}.invalid`
+			const url = new URL(`http://${invalidHostname}`)
+			url.hostname = ip
+			if (url.hostname !== invalidHostname) {
+				// valid
+				output.valid = true
+				output.output = decodeURIComponent(url.hostname)
+				if (output.output.startsWith('[')) {
+					// ipv6
+					output.output = output.output.slice(1, -1)
+				}
+			}
+			return output
+		}
+
+		/**
+		 * @param {string | Blob} input
+		 */
+		function toBlob(input) {
+			return input instanceof Blob ? input : new Blob([input])
+		}
+
+		/**
+		 * @param {string | Blob} input
+		 * @param {string} name
+		*/
+		function download(input, name) {
+			const a = document.createElement('a')
+			a.href = URL.createObjectURL(toBlob(input))
+			a.download = name
+			a.target = "_blank"
+			a.click()
+		}
+
+		/**
+		 * @param {string | Blob} input
+		*/
+		async function copy(input) {
+			const text = (
+				input instanceof Blob
+					? await input.text()
+					: input
+			)
+			try {
+				await navigator.clipboard.writeText(text)
+			} catch (e) {
+				console.error(e)
+				alert(e)
+			}
+		}
+
+		/**
+		 * @param {Date | number} d
+		 */
+		function updateTime(d) {
+			return new Intl.DateTimeFormat("zh", {
+				year: "numeric",
+				month: "numeric",
+				day: "numeric",
+				hour: "numeric",
+				minute: "numeric",
+				second: "numeric",
+				fractionalSecondDigits: 3,
+				hour12: false,
+				timeZoneName: "shortOffset",
+			}).format(d)
+		}
+
+		/**
+		 * @param {string | URL} url
+		 * @param {any} body
+		 */
+		function PostBody(url, body) {
+			return fetch(url, {
+				method: 'POST',
+				body: typeof body === "string"
+					? body
+					: JSON.stringify(body),
+			}).then(async r => {
+				if (r.ok)
+					return r
+				throw `${r.status} ${r.statusText}\n${await r.text()}`
+			})
+		}
+
+		async function generateCACert() {
+			try {
+				setDisabled(true,
+					CAGenerateButton,
+					ServerGenerateButton,
+					CADownloadCert,
+					CACopyCert,
+					CADownloadKey,
+					CACopyKey
+				)
+
+				const json = await PostBody('/api/generateCACert', {
+					CN: CAGenerate.querySelector('input[name=CN]').value,
+					Days: + CAGenerate.querySelector('input[name=Days]').value,
+					ECC: CAGenerate.querySelector('select[name=ECC]').value,
+				}).then(r => r.json())
+
+				certs.CA = {
+					Cert: json.Cert,
+					Key: json.Key,
+				}
+				CAUpdateTime.innerText = updateTime(json.Time)
+
+				setDisabled(false,
+					CADownloadCert,
+					CACopyCert,
+					CADownloadKey,
+					CACopyKey
+				)
+			} catch (e) {
+				console.error(e)
+				alert(e)
+				certs.CA = {}
+				CAUpdateTime.innerText = '-'
+			} finally {
+				setDisabled(false,
+					CAGenerateButton,
+					ServerGenerateButton
+				)
+			}
+		}
+
+		async function generateServerCert() {
+			try {
+				setDisabled(true,
+					ServerGenerateButton,
+					ServerDownloadCert,
+					ServerCopyCert,
+					ServerDownloadKey,
+					ServerCopyKey,
+					ServerDownloadP12
+				)
+
+				/** @type {{ DNS: string[], IP: string[] }} */
+				const SAN = { DNS: [], IP: [] }
+				ServerGenerate.querySelector('textarea[name=SAN]').value.split('\n').forEach(
+					/**
+					 * @param {string} v
+					 * @param {number} i
+					*/
+					(v, i) => {
+						v = v.trim()
+						if (!v) return
+						const check = checkIP(v)
+						if (!check.valid)
+							throw `Error: SAN line ${i} is invalid!`
+						if (check.isIP)
+							SAN.IP.push(check.output)
+						else
+							SAN.DNS.push(check.output)
+					}
+				);
+
+				/** @type {{ Cert: string; Key: string; }} */
+				let CA
+				if (CARadioInput.checked) {
+					// CA input
+					/** @type {HTMLInputElement} */
+					const inputCert = CAInput.querySelector('input[name=CACert]')
+					const certFiles = inputCert.files
+					if (certFiles.length === 0) {
+						throw "Error: Missing CA Cert"
+					}
+					/** @type {HTMLInputElement} */
+					const inputKey = CAInput.querySelector('input[name=CAKey]')
+					const keyFiles = inputKey.files
+					if (keyFiles.length === 0) {
+						throw "Error: Missing CA Key"
+					}
+					CA = {
+						Cert: await certFiles[0].text(),
+						Key: await keyFiles[0].text(),
+					}
+				} else {
+					// CA generate
+					if (!certs.CA || !certs.CA.Cert || !certs.CA.Key) {
+						await generateCACert()
+						if (!certs.CA || !certs.CA.Cert || !certs.CA.Key)
+							return
+					}
+					CA = certs.CA
+				}
+
+				const json = await PostBody('/api/generateServerCert', {
+					CA,
+					CN: ServerGenerate.querySelector('input[name=CN]').value,
+					Days: + ServerGenerate.querySelector('input[name=Days]').value,
+					SAN,
+					ECC: ServerGenerate.querySelector('select[name=ECC]').value,
+					P12Key: ServerGenerate.querySelector('input[name=P12Key]').value,
+				}).then(r => r.json())
+
+				certs.Server = {
+					Cert: json.Cert,
+					Key: json.Key,
+					P12: await fetch(`data:application/pkcs12;base64,${json.P12}`).then(r => r.blob()),
+				}
+				ServerUpdateTime.innerText = updateTime(json.Time)
+
+				setDisabled(false,
+					ServerDownloadCert,
+					ServerCopyCert,
+					ServerDownloadKey,
+					ServerCopyKey,
+					ServerDownloadP12
+				)
+			} catch (e) {
+				console.error(e)
+				alert(e)
+				ServerUpdateTime.innerText = '-'
+			} finally {
+				setDisabled(false,
+					ServerGenerateButton
+				)
+			}
+		}
+
+		CAGenerateButton.onclick = generateCACert
+		CADownloadCert.onclick = () => download(certs.CA.Cert, "ca.crt")
+		CACopyCert.onclick = () => copy(certs.CA.Cert)
+		CADownloadKey.onclick = () => download(certs.CA.Key, "ca.key")
+		CACopyKey.onclick = () => copy(certs.CA.Key)
+
+		ServerGenerateButton.onclick = generateServerCert
+		ServerDownloadCert.onclick = () => download(certs.Server.Cert, "server.crt")
+		ServerCopyCert.onclick = () => copy(certs.Server.Cert)
+		ServerDownloadKey.onclick = () => download(certs.Server.Key, "server.key")
+		ServerCopyKey.onclick = () => copy(certs.Server.Key)
+		ServerDownloadP12.onclick = () => download(certs.Server.P12, "server.p12")
+	</script>
+</body>
+
+</html>
