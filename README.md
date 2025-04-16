@@ -17,4 +17,4 @@ cd self-signing-certificate-tool
 
 ## Effect
 
-![img](img.jpg)
+![img](img.png)
