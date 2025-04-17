@@ -2,7 +2,7 @@
 
 ## View
 
-https://bddjr.github.io/self-signing-certificate-tool/
+https://bddjr.github.io/self-signing-certificate-tool/self-signing-certificate-tool.html
 
 ## Download
 
