@@ -16,7 +16,6 @@ If on Windows, use git bash.
 git clone https://github.com/bddjr/self-signing-certificate-tool
 cd self-signing-certificate-tool
 ./build.sh
-./self-signing-certificate-tool
 ```
 
 ## Effect
