@@ -23,7 +23,7 @@ jobs:
 
       - name: Build
         run: |
-          pnpm i
+          npm i
           chmod +x build.sh
           ./build.sh
 
