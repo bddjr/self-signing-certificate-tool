@@ -252,6 +252,12 @@
 			font-size: 12px;
 			color: gray;
 		}
+
+		@media (prefers-color-scheme: light) {
+			::placeholder {
+				color: lightgray;
+			}
+		}
 	</style>
 </head>
 
@@ -343,7 +349,8 @@
 				<div>
 					<span>SAN</span>
 					<div>
-						<textarea name="SAN" placeholder="Subject Alternative Name"></textarea>
+						<textarea name="SAN" placeholder="example.com
+*.example.com"></textarea>
 					</div>
 				</div>
 				<div>
