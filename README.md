@@ -1,6 +1,10 @@
 # Self-Signing Certificate Tool
 
-## Build
+## Download
+
+[releases](https://github.com/bddjr/self-signing-certificate-tool/releases)
+
+## Build from source
 
 Need dependencies:
 > [Git](https://git-scm.com)  
