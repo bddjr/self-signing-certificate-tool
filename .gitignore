@@ -2,3 +2,5 @@
 /self-signing-certificate-tool.*
 /ssct-*
 dist
+node_modules
+wasm

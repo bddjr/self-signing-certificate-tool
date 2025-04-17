@@ -1,0 +1,10 @@
+{
+  "name": "self-signing-certificate-tool",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {},
+  "dependencies": {
+    "html-minifier-terser": "^7.2.0"
+  }
+}

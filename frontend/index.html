@@ -12,7 +12,7 @@
 	<title>Self-Signing Certificate Tool</title>
 	<style>
 		.version::before {
-			content: 'v0.0.4';
+			content: 'v1.0.0';
 		}
 
 		* {
@@ -28,8 +28,9 @@
 			--blue: hsl(212, 100%, 50%);
 		}
 
-		#loading {
-			background: hsla(0, 0%, 0%, 0.3);
+		#divloading {
+			/* background: hsla(0, 0%, 0%, 0.2); */
+			background: white;
 			position: fixed;
 			top: 0;
 			right: 0;
@@ -38,20 +39,21 @@
 			display: flex;
 			justify-content: center;
 			align-items: center;
-			backdrop-filter: blur(4px);
+			/* backdrop-filter: blur(4px); */
+			z-index: 99;
 		}
 
-		#loading::before {
+		#divloading::before {
 			content: '';
-			animation: loadingcircle infinite 0.8s linear;
+			animation: loadingcircle infinite 0.7s linear;
 			width: 36px;
 			height: 36px;
 			border: 4px solid transparent;
-			border-left-color: white;
+			border-left-color: var(--blue);
 			border-radius: 100%;
 		}
 
-		#loading:not([loading]) {
+		#divloading:not([loading]) {
 			display: none;
 		}
 
@@ -62,13 +64,13 @@
 		}
 
 		main {
-			margin: 16px 16px 60px;
+			margin: 16px;
 		}
 
 		h1 {
 			font-size: 24px;
 			font-weight: 100;
-			margin-bottom: 0;
+			margin-bottom: 4px;
 		}
 
 		a {
@@ -79,6 +81,7 @@
 			border: none;
 			height: 1px;
 			background-color: lightblue;
+			margin-bottom: 16px;
 		}
 
 		button:not(.buttonradio),
@@ -248,9 +251,22 @@
 			margin: 16px 0 24px;
 		}
 
-		div.title>:not(:first-child) {
-			font-size: 12px;
+		.title-line2 {
+			display: flex;
+			gap: 6px;
+			font-size: 13px;
 			color: gray;
+		}
+
+		.title-line2 a {
+			color: gray;
+		}
+
+		pre {
+			background-color: hsla(0, 0%, 65%, 0.2);
+			padding: 12px;
+			border-radius: 8px;
+			font-size: 14px;
 		}
 
 		@media (prefers-color-scheme: light) {
@@ -258,19 +274,31 @@
 				color: lightgray;
 			}
 		}
+
+		@media (prefers-color-scheme: dark) {
+			#divloading {
+				background: black;
+			}
+
+			#divloading::before {
+				border-left-color: white;
+			}
+		}
 	</style>
 </head>
 
 <body>
-	<div id="loading"></div>
+	<div id="divloading" loading></div>
 	<main>
 		<div class="title">
 			<h1>Self-Signing Certificate Tool</h1>
-			<span class="version"></span>
-			<a style="font-size: 12px;" target="_blank"
-				href="https://github.com/bddjr/self-signing-certificate-tool">github.com/bddjr/self-signing-certificate-tool</a>
-			<hr>
+			<div class="title-line2">
+				<span class="version"></span>
+				<a target="_blank"
+					href="https://github.com/bddjr/self-signing-certificate-tool">github.com/bddjr/self-signing-certificate-tool</a>
+			</div>
 		</div>
+		<hr>
 		<div id="CA" class="certmain">
 			<h3>CA</h3>
 			<form id="CARadio">
@@ -300,7 +328,6 @@
 							<option value="P-224">P-224</option>
 							<option value="P-256">P-256</option>
 							<option value="P-384" selected>P-384</option>
-							<!-- <option value="P-521">P-521</option> -->
 						</select>
 					</div>
 				</div>
@@ -360,7 +387,6 @@
 							<option value="P-224">P-224</option>
 							<option value="P-256">P-256</option>
 							<option value="P-384" selected>P-384</option>
-							<!-- <option value="P-521">P-521</option> -->
 						</select>
 					</div>
 				</div>
@@ -391,282 +417,323 @@
 				</div>
 			</div>
 		</div>
+		<hr>
+		<span>If a downloaded file is locked in Windows, run the following command in the download directory using
+			PowerShell:</span>
+		<pre style="margin-top: 8px;">
+Unblock-File *.crt; Unblock-File *.key
+</pre>
 	</main>
 
 	<script>
-		/** @type {{
-			CA: {
-				Cert: string,
-				Key: string,
-			},
-			Server: {
-				Cert: string,
-				Key: string,
-				P12: Blob,
-			},
-		} */
-		const certs = { CA: {}, Server: {} }
-
-		/** 
-		 * @param {boolean} disabled
-		 * @param {HTMLButtonElement[]} elements
-		*/
-		function setDisabled(disabled, ...elements) {
-			for (const e of elements) {
-				e.disabled = disabled
-			}
-		}
-
 		/**
-		 * @param {string} ip
-		 */
-		function checkIP(ip) {
-			const output = {
-				valid: false,
-				isIP: false,
+		 * @type {{
+		 *   GenerateCACert(input: string): {
+		 *     Success: boolean
+		 *     Error: string
+		 *     Cert: string
+		 *     Key: string
+		 *     Time: number
+		 *   }
+		 *   GenerateServerCert(input: string): {
+		 *     Success: boolean
+		 *     Error: string
+		 *     Cert: string
+		 *     Key: string
+		 *     P12: string
+		 *     Time: number
+		 *   }
+		 * }}
+		*/
+		var backend
 
-				// example.com => example.com
-				// 127.0.0.1 => 127.0.0.1
-				// ::1 => ::1
-				// [::1] => ::1
-				output: ''
+		{
+			/** @type {{
+				CA: {
+					Cert: string,
+					Key: string,
+				},
+				Server: {
+					Cert: string,
+					Key: string,
+					P12: Blob,
+				},
+			} */
+			const certs = { CA: {}, Server: {} }
+
+			/** 
+			 * @param {boolean} disabled
+			 * @param {HTMLButtonElement[]} elements
+			*/
+			function setDisabled(disabled, ...elements) {
+				for (const e of elements) {
+					e.disabled = disabled
+				}
 			}
 
-			if (ip.includes(':')) {
-				if (ip.includes('.')) {
-					// invalid
-					return output
-				}
-				// ipv6
-				if (!ip.startsWith('[')) {
-					ip = `[${ip}]`
-				}
-				output.isIP = true
-			} else if (/^[0-9\.]+$/.test(ip)) {
-				// ipv4
-				output.isIP = true
-			}
+			/**
+			 * @param {string} ip
+			 */
+			function checkIP(ip) {
+				const output = {
+					valid: false,
+					isIP: false,
 
-			const invalidHostname = `${Date.now()}.invalid`
-			const url = new URL(`http://${invalidHostname}`)
-			url.hostname = ip
-			if (url.hostname !== invalidHostname) {
-				// valid
-				output.valid = true
-				output.output = decodeURIComponent(url.hostname)
-				if (output.output.startsWith('[')) {
+					// example.com => example.com
+					// 127.0.0.1 => 127.0.0.1
+					// ::1 => ::1
+					// [::1] => ::1
+					output: ''
+				}
+
+				if (ip.includes(':')) {
+					if (ip.includes('.')) {
+						// invalid
+						return output
+					}
 					// ipv6
-					output.output = output.output.slice(1, -1)
-				}
-			}
-			return output
-		}
-
-		/**
-		 * @param {string | Blob} input
-		 */
-		function toBlob(input) {
-			return input instanceof Blob ? input : new Blob([input])
-		}
-
-		/**
-		 * @param {string | Blob} input
-		 * @param {string} name
-		*/
-		function download(input, name) {
-			const a = document.createElement('a')
-			a.href = URL.createObjectURL(toBlob(input))
-			a.download = name
-			a.target = "_blank"
-			a.click()
-		}
-
-		/**
-		 * @param {string | Blob} input
-		*/
-		async function copy(input) {
-			const text = (
-				input instanceof Blob
-					? await input.text()
-					: input
-			)
-			try {
-				await navigator.clipboard.writeText(text)
-			} catch (e) {
-				console.error(e)
-				alert(e)
-			}
-		}
-
-		/**
-		 * @param {Date | number} d
-		 */
-		function updateTime(d) {
-			return new Intl.DateTimeFormat("zh", {
-				year: "numeric",
-				month: "numeric",
-				day: "numeric",
-				hour: "numeric",
-				minute: "numeric",
-				second: "numeric",
-				fractionalSecondDigits: 3,
-				hour12: false,
-				timeZoneName: "shortOffset",
-			}).format(d)
-		}
-
-		/**
-		 * @param {string | URL} url
-		 * @param {any} body
-		 */
-		function PostBody(url, body) {
-			return fetch(url, {
-				method: 'POST',
-				body: typeof body === "string"
-					? body
-					: JSON.stringify(body),
-			}).then(async r => {
-				if (r.ok)
-					return r
-				throw `${r.status} ${r.statusText}\n${await r.text()}`
-			})
-		}
-
-		async function generateCACert() {
-			try {
-				const json = await PostBody('/api/generateCACert', {
-					CN: CAGenerate.querySelector('input[name=CN]').value,
-					Days: + CAGenerate.querySelector('input[name=Days]').value,
-					ECC: CAGenerate.querySelector('select[name=ECC]').value,
-				}).then(r => r.json())
-
-				certs.CA = {
-					Cert: json.Cert,
-					Key: json.Key,
-				}
-				CAUpdateTime.innerText = updateTime(json.Time)
-
-				setDisabled(false,
-					CADownloadCert,
-					CACopyCert,
-					CADownloadKey,
-					CACopyKey
-				)
-			} catch (e) {
-				console.error(e)
-				alert(e)
-				certs.CA = {}
-				CAUpdateTime.innerText = '-'
-				setDisabled(true,
-					CADownloadCert,
-					CACopyCert,
-					CADownloadKey,
-					CACopyKey
-				)
-			}
-		}
-
-		async function generateServerCert() {
-			try {
-				/** @type {{ DNS: string[], IP: string[] }} */
-				const SAN = { DNS: [], IP: [] }
-				ServerGenerate.querySelector('textarea[name=SAN]').value.split('\n').forEach(
-					/**
-					 * @param {string} v
-					 * @param {number} i
-					*/
-					(v, i) => {
-						v = v.trim()
-						if (!v) return
-						const check = checkIP(v)
-						if (!check.valid)
-							throw `Error: SAN line ${i} is invalid!`
-						if (check.isIP)
-							SAN.IP.push(check.output)
-						else
-							SAN.DNS.push(check.output)
+					if (!ip.startsWith('[')) {
+						ip = `[${ip}]`
 					}
-				);
-
-				/** @type {{ Cert: string; Key: string; }} */
-				let CA
-				if (CARadioInput.checked) {
-					// CA input
-					/** @type {HTMLInputElement} */
-					const inputCert = CAInput.querySelector('input[name=CACert]')
-					const certFiles = inputCert.files
-					if (certFiles.length === 0) {
-						throw "Error: Missing CA Cert"
-					}
-					/** @type {HTMLInputElement} */
-					const inputKey = CAInput.querySelector('input[name=CAKey]')
-					const keyFiles = inputKey.files
-					if (keyFiles.length === 0) {
-						throw "Error: Missing CA Key"
-					}
-					CA = {
-						Cert: await certFiles[0].text(),
-						Key: await keyFiles[0].text(),
-					}
-				} else {
-					// CA generate
-					if (!certs.CA || !certs.CA.Cert || !certs.CA.Key) {
-						await generateCACert()
-						if (!certs.CA || !certs.CA.Cert || !certs.CA.Key)
-							return
-					}
-					CA = certs.CA
+					output.isIP = true
+				} else if (/^[0-9\.]+$/.test(ip)) {
+					// ipv4
+					output.isIP = true
 				}
 
-				const json = await PostBody('/api/generateServerCert', {
-					CA,
-					CN: ServerGenerate.querySelector('input[name=CN]').value,
-					Days: + ServerGenerate.querySelector('input[name=Days]').value,
-					SAN,
-					ECC: ServerGenerate.querySelector('select[name=ECC]').value,
-					P12Key: ServerGenerate.querySelector('input[name=P12Key]').value,
-				}).then(r => r.json())
-
-				certs.Server = {
-					Cert: json.Cert,
-					Key: json.Key,
-					P12: await fetch(`data:application/pkcs12;base64,${json.P12}`).then(r => r.blob()),
+				const invalidHostname = `${Date.now()}.invalid`
+				const url = new URL(`http://${invalidHostname}`)
+				url.hostname = ip
+				if (url.hostname !== invalidHostname) {
+					// valid
+					output.valid = true
+					output.output = decodeURIComponent(url.hostname)
+					if (output.output.startsWith('[')) {
+						// ipv6
+						output.output = output.output.slice(1, -1)
+					}
 				}
-				ServerUpdateTime.innerText = updateTime(json.Time)
-
-				setDisabled(false,
-					ServerDownloadCert,
-					ServerCopyCert,
-					ServerDownloadKey,
-					ServerCopyKey,
-					ServerDownloadP12
-				)
-			} catch (e) {
-				console.error(e)
-				alert(e)
-				ServerUpdateTime.innerText = '-'
-				setDisabled(true,
-					ServerDownloadCert,
-					ServerCopyCert,
-					ServerDownloadKey,
-					ServerCopyKey,
-					ServerDownloadP12
-				)
+				return output
 			}
+
+			/**
+			 * @param {string | Blob} input
+			 */
+			function toBlob(input) {
+				return input instanceof Blob ? input : new Blob([input])
+			}
+
+			/**
+			 * @param {string | Blob} input
+			 * @param {string} name
+			*/
+			function download(input, name) {
+				const a = document.createElement('a')
+				a.href = URL.createObjectURL(toBlob(input))
+				a.download = name
+				a.target = "_blank"
+				a.click()
+			}
+
+			/**
+			 * @param {string | Blob} input
+			*/
+			async function copy(input) {
+				const text = (
+					input instanceof Blob
+						? await input.text()
+						: input
+				)
+				try {
+					await navigator.clipboard.writeText(text)
+				} catch (e) {
+					console.error(e)
+					alert(e)
+				}
+			}
+
+			/**
+			 * @param {Date | number} d
+			 */
+			function updateTime(d) {
+				return new Intl.DateTimeFormat("zh", {
+					year: "numeric",
+					month: "numeric",
+					day: "numeric",
+					hour: "numeric",
+					minute: "numeric",
+					second: "numeric",
+					fractionalSecondDigits: 3,
+					hour12: false,
+					timeZoneName: "shortOffset",
+				}).format(d)
+			}
+
+			/**
+			 * @param {string | URL} url
+			 * @param {any} body
+			 */
+			function PostBody(url, body) {
+				return fetch(url, {
+					method: 'POST',
+					body: typeof body === "string"
+						? body
+						: JSON.stringify(body),
+				}).then(async r => {
+					if (r.ok)
+						return r
+					throw `${r.status} ${r.statusText}\n${await r.text()}`
+				})
+			}
+
+			async function generateCACert() {
+				try {
+					const json = backend.GenerateCACert(JSON.stringify({
+						CN: CAGenerate.querySelector('input[name=CN]').value,
+						Days: + CAGenerate.querySelector('input[name=Days]').value,
+						ECC: CAGenerate.querySelector('select[name=ECC]').value,
+					}))
+					if (!json.Success) {
+						throw json.Error
+					}
+
+					certs.CA = {
+						Cert: json.Cert,
+						Key: json.Key,
+					}
+					CAUpdateTime.innerText = updateTime(json.Time)
+
+					setDisabled(false,
+						CADownloadCert,
+						CACopyCert,
+						CADownloadKey,
+						CACopyKey
+					)
+				} catch (e) {
+					console.error(e)
+					alert(e)
+					certs.CA = {}
+					CAUpdateTime.innerText = '-'
+					setDisabled(true,
+						CADownloadCert,
+						CACopyCert,
+						CADownloadKey,
+						CACopyKey
+					)
+				}
+			}
+
+			async function generateServerCert() {
+				try {
+					/** @type {{ DNS: string[], IP: string[] }} */
+					const SAN = { DNS: [], IP: [] }
+					ServerGenerate.querySelector('textarea[name=SAN]').value.split('\n').forEach(
+						/**
+						 * @param {string} v
+						 * @param {number} i
+						*/
+						(v, i) => {
+							v = v.trim()
+							if (!v) return
+							const check = checkIP(v)
+							if (!check.valid)
+								throw `Error: SAN line ${i + 1} is invalid!`
+							if (check.isIP)
+								SAN.IP.push(check.output)
+							else
+								SAN.DNS.push(check.output)
+						}
+					);
+
+					/** @type {{ Cert: string; Key: string; }} */
+					let CA
+					if (CARadioInput.checked) {
+						// CA input
+						/** @type {HTMLInputElement} */
+						const inputCert = CAInput.querySelector('input[name=CACert]')
+						const certFiles = inputCert.files
+						if (certFiles.length === 0) {
+							throw "Error: Missing CA Cert"
+						}
+						/** @type {HTMLInputElement} */
+						const inputKey = CAInput.querySelector('input[name=CAKey]')
+						const keyFiles = inputKey.files
+						if (keyFiles.length === 0) {
+							throw "Error: Missing CA Key"
+						}
+						CA = {
+							Cert: await certFiles[0].text(),
+							Key: await keyFiles[0].text(),
+						}
+					} else {
+						// CA generate
+						if (!certs.CA || !certs.CA.Cert || !certs.CA.Key) {
+							await generateCACert()
+							if (!certs.CA || !certs.CA.Cert || !certs.CA.Key)
+								return
+						}
+						CA = certs.CA
+					}
+
+					const json = backend.GenerateServerCert(JSON.stringify({
+						CA,
+						CN: ServerGenerate.querySelector('input[name=CN]').value,
+						Days: + ServerGenerate.querySelector('input[name=Days]').value,
+						SAN,
+						ECC: ServerGenerate.querySelector('select[name=ECC]').value,
+						P12Key: ServerGenerate.querySelector('input[name=P12Key]').value,
+					}))
+					if (!json.Success) {
+						throw json.Error
+					}
+
+					certs.Server = {
+						Cert: json.Cert,
+						Key: json.Key,
+						P12: new Blob([json.P12]),
+					}
+					ServerUpdateTime.innerText = updateTime(json.Time)
+
+					setDisabled(false,
+						ServerDownloadCert,
+						ServerCopyCert,
+						ServerDownloadKey,
+						ServerCopyKey,
+						ServerDownloadP12
+					)
+				} catch (e) {
+					console.error(e)
+					alert(e)
+					ServerUpdateTime.innerText = '-'
+					setDisabled(true,
+						ServerDownloadCert,
+						ServerCopyCert,
+						ServerDownloadKey,
+						ServerCopyKey,
+						ServerDownloadP12
+					)
+				}
+			}
+
+			CAGenerateButton.onclick = generateCACert
+			CADownloadCert.onclick = () => download(certs.CA.Cert, "ca.crt")
+			CACopyCert.onclick = () => copy(certs.CA.Cert)
+			CADownloadKey.onclick = () => download(certs.CA.Key, "ca.key")
+			CACopyKey.onclick = () => copy(certs.CA.Key)
+
+			ServerGenerateButton.onclick = generateServerCert
+			ServerDownloadCert.onclick = () => download(certs.Server.Cert, "server.crt")
+			ServerCopyCert.onclick = () => copy(certs.Server.Cert)
+			ServerDownloadKey.onclick = () => download(certs.Server.Key, "server.key")
+			ServerCopyKey.onclick = () => copy(certs.Server.Key)
+			ServerDownloadP12.onclick = () => download(certs.Server.P12, "server.p12")
 		}
-
-		CAGenerateButton.onclick = generateCACert
-		CADownloadCert.onclick = () => download(certs.CA.Cert, "ca.crt")
-		CACopyCert.onclick = () => copy(certs.CA.Cert)
-		CADownloadKey.onclick = () => download(certs.CA.Key, "ca.key")
-		CACopyKey.onclick = () => copy(certs.CA.Key)
-
-		ServerGenerateButton.onclick = generateServerCert
-		ServerDownloadCert.onclick = () => download(certs.Server.Cert, "server.crt")
-		ServerCopyCert.onclick = () => copy(certs.Server.Cert)
-		ServerDownloadKey.onclick = () => download(certs.Server.Key, "server.key")
-		ServerCopyKey.onclick = () => copy(certs.Server.Key)
-		ServerDownloadP12.onclick = () => download(certs.Server.P12, "server.p12")
+	</script>
+	<script src="../wasm/wasm_exec.js"></script>
+	<script>
+		const go = new Go();
+		WebAssembly.instantiateStreaming(fetch("../wasm/main.wasm"), go.importObject)
+			.then((result) => go.run(result.instance));
 	</script>
 </body>
 

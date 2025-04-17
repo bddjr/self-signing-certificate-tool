@@ -12,26 +12,18 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"embed"
-	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
-	"io/fs"
 	"net"
-	"net/http"
-	"os/exec"
 	"runtime"
 	"strings"
+	"syscall/js"
 	"time"
 
 	"software.sslmate.com/src/go-pkcs12"
 )
-
-//go:embed frontend/*
-var FS embed.FS
 
 const (
 	certPEMType = "CERTIFICATE"
@@ -39,81 +31,52 @@ const (
 )
 
 func main() {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		panic(err)
-	}
-
-	openBrowser(l.Addr().String())
-
-	err = http.Serve(l, getRouter())
-	if err != http.ErrServerClosed {
-		panic(err)
-	}
+	println("Hello WebAssembly")
+	js.Global().Set("backend", js.ValueOf(map[string]any{
+		"GenerateCACert":     funcof(generateCACert),
+		"GenerateServerCert": funcof(generateServerCert),
+	}))
+	js.Global().Get("divloading").Call("removeAttribute", "loading")
+	select {}
 }
 
-func openBrowser(addr string) {
-	url := "http://" + addr
-	print("\n  Self-Signing Certificate Tool\n  " + url + "\n\n")
-	switch runtime.GOOS {
-	case "windows":
-		exec.Command("cmd", "/c", "start", url).Start()
-	case "darwin":
-		exec.Command("open", url).Start()
-	default:
-		exec.Command("xdg-open", url).Start()
-	}
-}
+func funcof(f func(input string) (map[string]any, error)) js.Func {
+	return js.FuncOf(func(this js.Value, args []js.Value) any {
+		type out struct {
+			output map[string]any
+			err    error
+		}
+		outChan := make(chan out, 1)
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					buf := make([]byte, 64<<10)
+					buf = buf[:runtime.Stack(buf, false)]
+					outChan <- out{err: fmt.Errorf("golang panic: %v\n%s", err, buf)}
+				}
+			}()
+			output, err := f(args[0].String())
+			if err != nil {
+				outChan <- out{err: err}
+			}
+			outChan <- out{output: output}
+		}()
 
-func getRouter() http.Handler {
-	router := http.NewServeMux()
-
-	router.HandleFunc("/api/generateCACert", mustPOST(generateCACert))
-	router.HandleFunc("/api/generateServerCert", mustPOST(generateServerCert))
-
-	f, _ := fs.Sub(FS, "frontend")
-	router.Handle("/", http.FileServerFS(f))
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		router.ServeHTTP(w, r)
+		output := <-outChan
+		if output.err != nil {
+			return js.ValueOf(map[string]any{
+				"Success": false,
+				"Error":   output.err.Error(),
+			})
+		}
+		return js.ValueOf(output.output)
 	})
 }
 
-func mustPOST(f func(w http.ResponseWriter, r *http.Request)) func(w http.ResponseWriter, r *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(405)
-			return
-		}
-		f(w, r)
-	}
-}
-
-func write200JSON(w http.ResponseWriter, responseBody any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(responseBody)
-}
-
-func write400Error(w http.ResponseWriter, err error) {
-	w.WriteHeader(400)
-	io.WriteString(w, err.Error())
-}
-
-func write500Error(w http.ResponseWriter, err error) {
-	w.WriteHeader(400)
-	io.WriteString(w, err.Error())
-}
-
-func write400String(w http.ResponseWriter, err string) {
-	w.WriteHeader(400)
-	io.WriteString(w, err)
-}
-
-func write500String(w http.ResponseWriter, err string) {
-	w.WriteHeader(400)
-	io.WriteString(w, err)
+func toUint8Array(src []byte) js.Value {
+	dst := js.Global().Get("Uint8Array").New(len(src))
+	js.CopyBytesToJS(dst, src)
+	return dst
 }
 
 // 生成 ECC 私钥
@@ -127,6 +90,7 @@ func generateKey(name string) (*ecdsa.PrivateKey, error) {
 	case "P-384":
 		p = elliptic.P384()
 	case "P-521":
+		// 浏览器不支持这个算法，因此前端没有这个选项。
 		p = elliptic.P521()
 	default:
 		return nil, errors.New("generateKey: unknown name")
@@ -172,31 +136,28 @@ func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
 	return nil, errors.New("parsePrivateKey: failed to parse private key")
 }
 
-func generateCACert(w http.ResponseWriter, r *http.Request) {
+func generateCACert(input string) (map[string]any, error) {
 	requestBody := &struct {
 		CN   string
 		Days int64
 		ECC  string
 	}{}
 
-	err := json.NewDecoder(r.Body).Decode(requestBody)
+	err := json.Unmarshal([]byte(input), requestBody)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 生成私钥
 	privateKey, err := generateKey(requestBody.ECC)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 编码私钥为 PKCS8 格式
 	privPKCS8, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 创建证书模板
@@ -222,24 +183,20 @@ func generateCACert(w http.ResponseWriter, r *http.Request) {
 		privateKey,
 	)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
-	// 构建响应
-	responseBody := &struct {
-		Cert string // PEM
-		Key  string // PEM
-		Time int64  // UnixMilli
-	}{
-		Cert: certToPEM(certDER),
-		Key:  pkcs8ToPEM(privPKCS8),
-		Time: Time.UnixMilli(),
-	}
-	write200JSON(w, responseBody)
+	// 响应
+	return map[string]any{
+		"Success": true,
+		"Error":   "",
+		"Cert":    certToPEM(certDER),    // PEM
+		"Key":     pkcs8ToPEM(privPKCS8), // PEM
+		"Time":    Time.UnixMilli(),      // UnixMilli
+	}, nil
 }
 
-func generateServerCert(w http.ResponseWriter, r *http.Request) {
+func generateServerCert(input string) (map[string]any, error) {
 	requestBody := &struct {
 		CA struct {
 			Cert string
@@ -255,10 +212,9 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		P12Key string
 	}{}
 
-	err := json.NewDecoder(r.Body).Decode(requestBody)
+	err := json.Unmarshal([]byte(input), requestBody)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 解析 CA 证书
@@ -267,8 +223,7 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		// PEM
 		DERBlock, _ := pem.Decode([]byte(requestBody.CA.Cert))
 		if DERBlock == nil || DERBlock.Type != certPEMType {
-			write500String(w, "Failed to decode PEM CERTIFICATE")
-			return
+			return nil, errors.New("Failed to decode PEM CERTIFICATE")
 		}
 		CACert, err = x509.ParseCertificate(DERBlock.Bytes)
 	} else {
@@ -276,8 +231,7 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		CACert, err = x509.ParseCertificate([]byte(requestBody.CA.Cert))
 	}
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 解析 CA 私钥
@@ -286,8 +240,7 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		// PEM
 		DERBlock, _ := pem.Decode([]byte(requestBody.CA.Key))
 		if DERBlock == nil || DERBlock.Type != keyPEMType {
-			write500String(w, "Failed to decode PEM PRIVATE KEY")
-			return
+			return nil, errors.New("Failed to decode PEM PRIVATE KEY")
 		}
 		CAKey, err = parsePrivateKey(DERBlock.Bytes)
 	} else {
@@ -295,22 +248,19 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		CAKey, err = parsePrivateKey([]byte(requestBody.CA.Key))
 	}
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 生成私钥
 	privateKey, err := generateKey(requestBody.ECC)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 编码私钥为 PKCS8 格式
 	privPKCS8, err := x509.MarshalPKCS8PrivateKey(privateKey)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 创建证书模板
@@ -330,8 +280,7 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 	for i, v := range requestBody.SAN.IP {
 		ip := net.ParseIP(v)
 		if ip == nil {
-			write400String(w, fmt.Sprint("Error: SAN line ", i, " is invalid!"))
-			return
+			return nil, errors.New(fmt.Sprint("Error: SAN line ", i+1, " is invalid!"))
 		}
 		template.IPAddresses[i] = ip
 	}
@@ -345,15 +294,13 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		CAKey,
 	)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 解析新证书
 	cert, err := x509.ParseCertificate(certDER)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 编码为 PKCS12 格式
@@ -364,21 +311,16 @@ func generateServerCert(w http.ResponseWriter, r *http.Request) {
 		requestBody.P12Key,
 	)
 	if err != nil {
-		write500Error(w, err)
-		return
+		return nil, err
 	}
 
 	// 构建响应
-	responseBody := &struct {
-		Cert string // PEM
-		Key  string // PEM
-		P12  string // Base64
-		Time int64  // UnixMilli
-	}{
-		Cert: certToPEM(certDER),
-		Key:  pkcs8ToPEM(privPKCS8),
-		P12:  base64.StdEncoding.EncodeToString(p12),
-		Time: Time.UnixMilli(),
-	}
-	write200JSON(w, responseBody)
+	return map[string]any{
+		"Success": true,
+		"Error":   "",
+		"Cert":    certToPEM(certDER),    // PEM
+		"Key":     pkcs8ToPEM(privPKCS8), // PEM
+		"P12":     toUint8Array(p12),     // Uint8Array
+		"Time":    Time.UnixMilli(),      // UnixMilli
+	}, nil
 }
