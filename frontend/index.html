@@ -12,7 +12,7 @@
 	<title>Self-Signing Certificate Tool</title>
 	<style>
 		.version::before {
-			content: 'v0.0.3';
+			content: 'v0.0.4';
 		}
 
 		* {
@@ -534,15 +534,6 @@
 
 		async function generateCACert() {
 			try {
-				setDisabled(true,
-					CAGenerateButton,
-					ServerGenerateButton,
-					CADownloadCert,
-					CACopyCert,
-					CADownloadKey,
-					CACopyKey
-				)
-
 				const json = await PostBody('/api/generateCACert', {
 					CN: CAGenerate.querySelector('input[name=CN]').value,
 					Days: + CAGenerate.querySelector('input[name=Days]').value,
@@ -566,25 +557,17 @@
 				alert(e)
 				certs.CA = {}
 				CAUpdateTime.innerText = '-'
-			} finally {
-				setDisabled(false,
-					CAGenerateButton,
-					ServerGenerateButton
+				setDisabled(true,
+					CADownloadCert,
+					CACopyCert,
+					CADownloadKey,
+					CACopyKey
 				)
 			}
 		}
 
 		async function generateServerCert() {
 			try {
-				setDisabled(true,
-					ServerGenerateButton,
-					ServerDownloadCert,
-					ServerCopyCert,
-					ServerDownloadKey,
-					ServerCopyKey,
-					ServerDownloadP12
-				)
-
 				/** @type {{ DNS: string[], IP: string[] }} */
 				const SAN = { DNS: [], IP: [] }
 				ServerGenerate.querySelector('textarea[name=SAN]').value.split('\n').forEach(
@@ -662,9 +645,12 @@
 				console.error(e)
 				alert(e)
 				ServerUpdateTime.innerText = '-'
-			} finally {
-				setDisabled(false,
-					ServerGenerateButton
+				setDisabled(true,
+					ServerDownloadCert,
+					ServerCopyCert,
+					ServerDownloadKey,
+					ServerCopyKey,
+					ServerDownloadP12
 				)
 			}
 		}
