@@ -27,7 +27,3 @@ pnpm i
 chmod +x build.sh
 ./build.sh
 ```
-
-## Effect
-
-![img](img.png)
