@@ -42,34 +42,25 @@ func main() {
 
 func funcof(f func(input string) (map[string]any, error)) js.Func {
 	return js.FuncOf(func(this js.Value, args []js.Value) any {
-		type out struct {
-			output map[string]any
-			err    error
-		}
-		outChan := make(chan out, 1)
+		var output map[string]any
+		var outErr error
 		func() {
 			defer func() {
 				if err := recover(); err != nil {
 					buf := make([]byte, 64<<10)
 					buf = buf[:runtime.Stack(buf, false)]
-					outChan <- out{err: fmt.Errorf("golang panic: %v\n%s", err, buf)}
+					outErr = fmt.Errorf("golang panic: %v\n%s", err, buf)
 				}
 			}()
-			output, err := f(args[0].String())
-			if err != nil {
-				outChan <- out{err: err}
-			}
-			outChan <- out{output: output}
+			output, outErr = f(args[0].String())
 		}()
-
-		output := <-outChan
-		if output.err != nil {
+		if outErr != nil {
 			return js.ValueOf(map[string]any{
 				"Success": false,
-				"Error":   output.err.Error(),
+				"Error":   outErr.Error(),
 			})
 		}
-		return js.ValueOf(output.output)
+		return js.ValueOf(output)
 	})
 }
 

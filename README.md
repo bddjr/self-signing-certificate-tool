@@ -1,8 +1,10 @@
 # Self-Signing Certificate Tool
 
+Use WASM implementation without uploading any content.
+
 ## View
 
-https://bddjr.github.io/self-signing-certificate-tool/self-signing-certificate-tool.html
+https://bddjr.com/ssct.html
 
 ## Download
 

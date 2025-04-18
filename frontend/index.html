@@ -12,7 +12,7 @@
 	<title>Self-Signing Certificate Tool</title>
 	<style>
 		.version::before {
-			content: 'v1.0.0';
+			content: 'v1.0.1';
 		}
 
 		* {
@@ -68,7 +68,7 @@
 		}
 
 		h1 {
-			font-size: 24px;
+			font-size: 28px;
 			font-weight: 100;
 			margin-bottom: 4px;
 		}
@@ -251,6 +251,11 @@
 			margin: 16px 0 24px;
 		}
 
+		.title-description {
+			font-size: 13px;
+			margin-bottom: 4px;
+		}
+
 		.title-line2 {
 			display: flex;
 			gap: 6px;
@@ -263,7 +268,8 @@
 		}
 
 		pre {
-			background-color: hsla(0, 0%, 65%, 0.2);
+			background-color: #0C0C0C;
+			color: #eee;
 			padding: 12px;
 			border-radius: 8px;
 			font-size: 14px;
@@ -292,6 +298,7 @@
 	<main>
 		<div class="title">
 			<h1>Self-Signing Certificate Tool</h1>
+			<div class="title-description">Use WASM implementation without uploading any content.</div>
 			<div class="title-line2">
 				<span class="version"></span>
 				<a target="_blank"
@@ -418,9 +425,9 @@
 			</div>
 		</div>
 		<hr>
-		<span>If a downloaded file is locked in Windows, run the following command in the download directory using
+		<span>If downloaded files is locked in Windows, run this command in the download directory using
 			PowerShell:</span>
-		<pre style="margin-top: 8px;">
+		<pre>
 Unblock-File *.crt; Unblock-File *.key
 </pre>
 	</main>

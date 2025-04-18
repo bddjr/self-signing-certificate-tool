@@ -3,7 +3,7 @@ import zlib from 'zlib'
 import { minify } from 'html-minifier-terser'
 import { pathToFileURL } from 'url'
 
-const outpath = 'dist/self-signing-certificate-tool.html'
+const outpath = 'dist/ssct.html'
 
 const wasm_exec = fs.readFileSync('wasm/wasm_exec.js').toString()
 const wasm_main = fs.readFileSync('wasm/main.wasm').toString('base64')
