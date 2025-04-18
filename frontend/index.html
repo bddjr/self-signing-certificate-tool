@@ -12,7 +12,7 @@
 	<title>Self-Signing Certificate Tool</title>
 	<style>
 		.version::before {
-			content: 'v1.0.2';
+			content: 'v1.0.3';
 		}
 
 		* {
@@ -26,6 +26,7 @@
 			max-width: 500px;
 			margin: 0 auto;
 			--blue: hsl(212, 100%, 50%);
+			--cyan: hsl(195, 100%, 50%);
 		}
 
 		#divloading {
@@ -115,7 +116,7 @@
 		textarea,
 		select {
 			padding: 6px;
-			border: hsl(195, 100%, 50%) solid 1px;
+			border: var(--cyan) solid 1px;
 			border-radius: 6px;
 			font-size: 15px;
 		}
@@ -251,7 +252,7 @@
 		}
 
 		.title-description {
-			font-size: 13px;
+			font-size: 14px;
 			margin-bottom: 4px;
 		}
 
@@ -267,8 +268,8 @@
 		}
 
 		pre {
-			background-color: #0C0C0C;
-			color: #eee;
+			background-color: #222;
+			color: white;
 			padding: 12px;
 			border-radius: 8px;
 			font-size: 14px;
@@ -286,7 +287,7 @@
 			}
 
 			#divloading::before {
-				border-left-color: white;
+				border-left-color: var(--cyan);
 			}
 		}
 	</style>
