@@ -2,7 +2,7 @@
 
 Use WASM implementation without uploading any content.
 
-https://bddjr.com/ssct
+https://bddjr.github.io/self-signing-certificate-tool/
 
 ## Build from source
 
